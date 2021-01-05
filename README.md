@@ -15,7 +15,7 @@ local MQTT server as a means for configuring the clock while it is running
 without needing to update the code.
 
 ### To be done for MVP version 1:
-- [ ] Display the time and date.
+- [x] Display the time and date.
 - [ ] Display the current weather (from openweathermap.org).
 - [ ] Display the weather forecast.
 - [ ] Display "days until" events that have been configured on the device.
