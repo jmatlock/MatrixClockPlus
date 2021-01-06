@@ -18,7 +18,7 @@ without needing to update the code.
 - [x] Display the time and date.
 - [ ] Display the current weather (from openweathermap.org). :construction:
 - [ ] Display the weather forecast.
-- [ ] Display "days until" events that have been configured on the device.
+- [ ] Display "days until" events that have been configured on the device. :construction:
 
 ### To be done for advanced versions:
 - [ ] Show news headlines from scraped news sites.
