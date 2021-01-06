@@ -16,7 +16,7 @@ without needing to update the code.
 
 ### To be done for MVP version 1:
 - [x] Display the time and date.
-- [ ] Display the current weather (from openweathermap.org).
+- [ ] Display the current weather (from openweathermap.org). :construction:
 - [ ] Display the weather forecast.
 - [ ] Display "days until" events that have been configured on the device.
 

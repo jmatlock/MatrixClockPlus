@@ -31,9 +31,14 @@ the Matrix Portal:
 See this page for more info about installing CircuitPython libraries:
     https://learn.adafruit.com/welcome-to-circuitpython/circuitpython-libraries
 
-This project is under development. The plan is for the clock to have the
-following features:
-- Tell time
+This project is under development.
+
+Currently the clock has the following features:
+- Tells time
+- Shows date and day of the week
+- Shows the temperature from openweathermap.org
+
+The plan is for the clock to have the following features:
 - Display "days/weeks/months" until event information.
 - Collect weather info from openweathermap.org and display.
 - Use fixed and scrolling text display. Possibly develop a vertical scrolling
@@ -48,9 +53,6 @@ Tutorials and references used as input to this project include:
 - https://learn.adafruit.com/weather-display-matrix
 - https://learn.adafruit.com/creating-projects-with-the-circuitpython-matrixportal-library
 """
-
-# Metro Matrix Clock
-# Runs on Airlift Metro M4 with 64x32 RGB Matrix display & shield
 
 import time
 import board
@@ -73,13 +75,22 @@ try:
 except ImportError:
     print("WiFi secrets are kept in secrets.py, please add them there!")
     raise
-print("    Metro Minimal Clock")
+print("    Matrix Clock Plus")
 print("Time will be set for {}".format(secrets["timezone"]))
 
 # --- Display setup ---
 matrix = Matrix()
 display = matrix.display
 network = Network(status_neopixel=board.NEOPIXEL, debug=False)
+
+# --- Weather data setup ---
+UNITS = "imperial"
+DATA_LOCATION = []
+DATA_SOURCE = (
+        "http://api.openweathermap.org/data/2.5/weather?q=" + secrets["openweather_loc"] + "&units=" + UNITS
+)
+DATA_SOURCE += "&appid=" + secrets["openweather_token"]
+current_temp = '0'
 
 # --- Drawing setup ---
 group = displayio.Group(max_size=4)  # Create a Group
@@ -103,9 +114,31 @@ else:
 
 clock_label = Label(font, max_glyphs=6)
 
+DATA_LOCATION = []
+class Weather:
+    weather_refresh = None
+    weather_data = None
 
-def update_time(*, hours=None, minutes=None, show_colon=False):
+
+def get_weather_info():
+    try:
+        value = network.fetch_data(DATA_SOURCE, json_path=(DATA_LOCATION,))
+        print("Response is", value)
+        return value
+    except RuntimeError as e:
+        print("Some error occurred, retrying! -", e)
+        return None
+
+
+def update_time(*, hours=None, minutes=None, show_colon=False,
+                weather=None):
     now = time.localtime()  # Get the time values we need
+    # Update weather data every 10 minutes
+    if (not weather.weather_refresh) or (time.monotonic() - weather.weather_refresh) > 600:
+        weather.weather_data = get_weather_info()
+        if weather.weather_data:
+            weather.weather_refresh = time.monotonic()
+
     # print(now)
     if hours is None:
         hours = now[3]
@@ -126,16 +159,22 @@ def update_time(*, hours=None, minutes=None, show_colon=False):
     else:
         colon = ":"
 
-    if now[5] % 15 < 10:
+    if now[5] % 15 < 7:
         clock_label.text = "{hours}{colon}{minutes:02d}".format(
             hours=hours, minutes=minutes, colon=colon
         )
         clock_label.font = font
-    elif now[5] % 15 < 12:
+    elif now[5] % 15 < 9:
         clock_label.text = f"{wkdays[now[6]]}"
-    else:
-        clock_label.text = f"{months[now[1]]} {now[2]}"
+    elif now[5] % 15 < 12:
         clock_label.font = font2
+        clock_label.text = f"{months[now[1]]} {now[2]}"
+    else:
+        try:
+            temperature = int(weather.weather_data["main"]["temp"])
+        except Exception as e:
+            temperature = "??"
+        clock_label.text = f"{temperature}°F"
 
     bbx, bby, bbwidth, bbh = clock_label.bounding_box
     # Center the label
@@ -146,20 +185,22 @@ def update_time(*, hours=None, minutes=None, show_colon=False):
         print("Label x: {} y: {}".format(clock_label.x, clock_label.y))
 
 
+weather = Weather()
 last_check = None
-update_time(show_colon=True)  # Display whatever time is on the board
+update_time(show_colon=True, weather=weather)  # Display whatever time is on the board
 group.append(clock_label)  # add the clock label to the group
 
 while True:
     if last_check is None or time.monotonic() > last_check + 3600:
         try:
             update_time(
-                show_colon=True
+                show_colon=True,
+                weather=weather
             )  # Make sure a colon is displayed while updating
             network.get_local_time()  # Synchronize Board's clock to Internet
             last_check = time.monotonic()
         except RuntimeError as e:
             print("Some error occured, retrying! -", e)
 
-    update_time()
+    update_time(weather=weather)
     time.sleep(1)
