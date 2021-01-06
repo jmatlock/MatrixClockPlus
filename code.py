@@ -107,18 +107,39 @@ group.append(tile_grid)  # Add the TileGrid to the Group
 display.show(group)
 
 if not DEBUG:
-    font = bitmap_font.load_font("fonts/IBMPlexMono-Medium-24_jep.bdf")
-    font2 = bitmap_font.load_font("fonts/Arial-16.bdf")
+    # font = bitmap_font.load_font("fonts/IBMPlexMono-Medium-24_jep.bdf")
+    font = bitmap_font.load_font("fonts/Arial-14.bdf")
+    font2 = bitmap_font.load_font("fonts/Arial-12.bdf")
 else:
     font = terminalio.FONT
+    font2 = terminalio.FONT
 
 clock_label = Label(font, max_glyphs=6)
+test_label = Label(font2, max_glyphs=32)
 
 DATA_LOCATION = []
+
+
 class Weather:
     weather_refresh = None
     weather_data = None
 
+
+class Events:
+    def __init__(self):
+        self.index = 0
+        self.events = {'Christmas': [12, 25],
+                  'Halloween': [10, 31],
+                  'My birthday': [5, 29],
+                  'July 4': [7, 4],
+                  }
+
+    def get_next_event_string(self):
+        event = list(self.events.items())[self.index]
+        self.index += 1
+        if self.index >= len(self.events):
+            self.index = 0
+        return f'{event[0]} occurs on {event[1][0]}/{event[1][1]}'
 
 def get_weather_info():
     try:
@@ -159,15 +180,14 @@ def update_time(*, hours=None, minutes=None, show_colon=False,
     else:
         colon = ":"
 
-    if now[5] % 15 < 7:
+    if now[5] % 20 < 10:
         clock_label.text = "{hours}{colon}{minutes:02d}".format(
             hours=hours, minutes=minutes, colon=colon
         )
         clock_label.font = font
-    elif now[5] % 15 < 9:
+    elif now[5] % 20 < 13:
         clock_label.text = f"{wkdays[now[6]]}"
-    elif now[5] % 15 < 12:
-        clock_label.font = font2
+    elif now[5] % 20 < 16:
         clock_label.text = f"{months[now[1]]} {now[2]}"
     else:
         try:
@@ -179,18 +199,34 @@ def update_time(*, hours=None, minutes=None, show_colon=False,
     bbx, bby, bbwidth, bbh = clock_label.bounding_box
     # Center the label
     clock_label.x = round(display.width / 2 - bbwidth / 2)
-    clock_label.y = display.height // 2
+    clock_label.y = display.height // 4
     if DEBUG:
         print("Label bounding box: {},{},{},{}".format(bbx, bby, bbwidth, bbh))
         print("Label x: {} y: {}".format(clock_label.x, clock_label.y))
 
 
+def update_second_line(value):
+    test_label.text = f'{value}'
+    bbx, bby, bbwidth, bbh = test_label.bounding_box
+    x = round(display.width / 2 - bbwidth / 2)
+    if x < 0:
+        test_label.x = 0
+    else:
+        test_label.x = x
+    test_label.y = display.height // 4 * 3
+
+
 weather = Weather()
+events = Events()
 last_check = None
 update_time(show_colon=True, weather=weather)  # Display whatever time is on the board
+update_second_line('?')
 group.append(clock_label)  # add the clock label to the group
+group.append(test_label)
 
+counter = 0
 while True:
+    counter += 1
     if last_check is None or time.monotonic() > last_check + 3600:
         try:
             update_time(
@@ -203,4 +239,11 @@ while True:
             print("Some error occured, retrying! -", e)
 
     update_time(weather=weather)
+    if counter % 4 == 0:
+        event_txt = events.get_next_event_string()
+        update_second_line(event_txt)
+        if counter >= 100:
+            counter = 0
+        print(event_txt)
+
     time.sleep(1)
