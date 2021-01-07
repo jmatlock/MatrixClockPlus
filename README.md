@@ -5,7 +5,7 @@ Matrix Portal Clock Plus
 This CircuitPython project will drive an RGB LED Matrix using an Adafruit
 Matrix Portal to show the time, weather, and other interesting information.
 Much of this project is a mashup of many of the tutorials provided by Adafruit,
-but there will be a lot of original ideas in here as well to make this a 
+but there will be a some original ideas in here as well to make this a 
 useful, configurable clock.
 
 Initially this display will just combine a clock with weather information,
@@ -16,11 +16,11 @@ without needing to update the code.
 
 ### To be done for MVP version 1:
 - [x] Display the time and date.
-- [ ] Display the current weather (from openweathermap.org). :construction:
-- [ ] Display the weather forecast.
-- [ ] Display "days until" events that have been configured on the device. :construction:
+- [x] Display the current weather (from openweathermap.org).
+- [x] Display "days until" events that have been configured on the device.
 
 ### To be done for advanced versions:
+- [ ] Display the weather forecast.
 - [ ] Show news headlines from scraped news sites.
 - [ ] Provide an alarm function (configuration means TBD)
 - [ ] Setup an MQTT Server to be used for passing configuration or data

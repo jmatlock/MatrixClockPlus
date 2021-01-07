@@ -75,8 +75,7 @@ try:
 except ImportError:
     print("WiFi secrets are kept in secrets.py, please add them there!")
     raise
-print("    Matrix Clock Plus")
-print("Time will be set for {}".format(secrets["timezone"]))
+print("Matrix Clock Plus")
 
 # --- Display setup ---
 matrix = Matrix()
@@ -110,11 +109,12 @@ if not DEBUG:
     # font = bitmap_font.load_font("fonts/IBMPlexMono-Medium-24_jep.bdf")
     font = bitmap_font.load_font("fonts/Arial-14.bdf")
     font2 = bitmap_font.load_font("fonts/Arial-12.bdf")
+    small_font = bitmap_font.load_font("fonts/helvR10.bdf")
 else:
     font = terminalio.FONT
     font2 = terminalio.FONT
 
-clock_label = Label(font, max_glyphs=6)
+clock_label = Label(font, max_glyphs=8)
 test_label = Label(font2, max_glyphs=32)
 
 DATA_LOCATION = []
@@ -130,16 +130,46 @@ class Events:
         self.index = 0
         self.events = {'Christmas': [12, 25],
                   'Halloween': [10, 31],
-                  'My birthday': [5, 29],
-                  'July 4': [7, 4],
+                  "Jim's birthday": [5, 29],
+                  'Independence Day': [7, 4],
                   }
 
     def get_next_event_string(self):
         event = list(self.events.items())[self.index]
+        results = f'{self.get_time_until()}{event[0]}'
         self.index += 1
         if self.index >= len(self.events):
             self.index = 0
-        return f'{event[0]} occurs on {event[1][0]}/{event[1][1]}'
+        return results
+
+    def get_time_until(self):
+        event = list(self.events.items())[self.index]
+        event_time = time.struct_time(
+            (
+                2021,
+                event[1][0],
+                event[1][1],
+                12,
+                0,
+                0,
+                -1,
+                -1,
+                False,
+            )
+        )
+        remaining = time.mktime(event_time) - time.mktime(time.localtime())
+        if remaining <= 0:
+            # oh, its event time!
+            return '0 days till '
+
+        remaining //= (24 * 60 * 60)
+        days_remaining = remaining
+
+        text = f'{days_remaining} day'
+        if days_remaining != 1:
+            text += "s"
+        return text + ' till '
+
 
 def get_weather_info():
     try:
@@ -175,26 +205,34 @@ def update_time(*, hours=None, minutes=None, show_colon=False,
     if minutes is None:
         minutes = now[4]
 
-    if BLINK:
-        colon = ":" if show_colon or now[5] % 2 else " "
-    else:
-        colon = ":"
+    # if BLINK:
+    #     colon = ":" if show_colon or now[5] % 2 else " "
+    # else:
+    #     colon = ":"
 
-    if now[5] % 20 < 10:
-        clock_label.text = "{hours}{colon}{minutes:02d}".format(
-            hours=hours, minutes=minutes, colon=colon
-        )
+    if now[5] % 30 < 12:
+        clock_label.text = f"{hours}:{minutes:02d}"
         clock_label.font = font
-    elif now[5] % 20 < 13:
+    elif now[5] % 30 < 15:
         clock_label.text = f"{wkdays[now[6]]}"
-    elif now[5] % 20 < 16:
+    elif now[5] % 30 < 20:
         clock_label.text = f"{months[now[1]]} {now[2]}"
-    else:
+    elif now[5] % 30 < 25:
         try:
             temperature = int(weather.weather_data["main"]["temp"])
         except Exception as e:
             temperature = "??"
         clock_label.text = f"{temperature}°F"
+    else:
+        try:
+            weather_description = weather.weather_data["weather"][0]["main"]
+            if weather_description == 'Thunderstorm':
+                weather_description = 'T-Storm'
+        except Exception as e:
+            weather_description = "??"
+        if len(weather_description) > 6:
+            clock_label.font = font2
+        clock_label.text = f"{weather_description}"
 
     bbx, bby, bbwidth, bbh = clock_label.bounding_box
     # Center the label
@@ -205,7 +243,7 @@ def update_time(*, hours=None, minutes=None, show_colon=False,
         print("Label x: {} y: {}".format(clock_label.x, clock_label.y))
 
 
-def update_second_line(value):
+def update_second_line():
     test_label.text = f'{value}'
     bbx, bby, bbwidth, bbh = test_label.bounding_box
     x = round(display.width / 2 - bbwidth / 2)
@@ -216,11 +254,20 @@ def update_second_line(value):
     test_label.y = display.height // 4 * 3
 
 
+def scroll_second_line():
+    if test_label.text is None or test_label.x < -test_label.bounding_box[2]:
+        test_label.text = ''
+        test_label.x = display.width
+        test_label.y = display.height // 4 * 3
+        test_label.text = events.get_next_event_string()
+    else:
+        test_label.x -= 1
+
 weather = Weather()
 events = Events()
 last_check = None
 update_time(show_colon=True, weather=weather)  # Display whatever time is on the board
-update_second_line('?')
+# update_second_line('?')
 group.append(clock_label)  # add the clock label to the group
 group.append(test_label)
 
@@ -239,11 +286,12 @@ while True:
             print("Some error occured, retrying! -", e)
 
     update_time(weather=weather)
-    if counter % 4 == 0:
-        event_txt = events.get_next_event_string()
-        update_second_line(event_txt)
-        if counter >= 100:
-            counter = 0
-        print(event_txt)
+    # if counter % 4 == 0:
+    #     event_txt = events.get_next_event_string()
+    #     update_second_line(event_txt)
+    #     if counter >= 100:
+    #         counter = 0
+    #     print(event_txt)
+    scroll_second_line()
 
-    time.sleep(1)
+    time.sleep(0.03)
