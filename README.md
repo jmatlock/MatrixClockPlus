@@ -18,6 +18,7 @@ without needing to update the code.
 - [x] Display the time and date.
 - [x] Display the current weather (from openweathermap.org).
 - [x] Display "days until" events that have been configured on the device.
+- [x] Use Up/Down buttons to change text colors.
 
 ### To be done for advanced versions:
 - [ ] Display the weather forecast.

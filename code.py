@@ -56,6 +56,7 @@ Tutorials and references used as input to this project include:
 
 import time
 import board
+from digitalio import DigitalInOut, Direction, Pull
 import displayio
 import terminalio
 from adafruit_display_text.label import Label
@@ -68,6 +69,14 @@ DEBUG = False
 
 months = ['na', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 wkdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+color_codes = {'Red': 0x660000,
+               'Orange': 0x882200,
+               'Yellow': 0x666600,
+               'Green': 0x006600,
+               'Blue': 0x000066,
+               'Violet': 0x663666,
+               'White': 0x444444,
+               }
 
 # Get wifi details and more from a secrets.py file
 try:
@@ -81,6 +90,10 @@ print("Matrix Clock Plus")
 matrix = Matrix()
 display = matrix.display
 network = Network(status_neopixel=board.NEOPIXEL, debug=False)
+button_down = DigitalInOut(board.BUTTON_DOWN)
+button_down.switch_to_input(pull=Pull.UP)
+button_up = DigitalInOut(board.BUTTON_UP)
+button_up.switch_to_input(pull=Pull.UP)
 
 # --- Weather data setup ---
 UNITS = "imperial"
@@ -93,12 +106,11 @@ current_temp = '0'
 
 # --- Drawing setup ---
 group = displayio.Group(max_size=4)  # Create a Group
-bitmap = displayio.Bitmap(64, 32, 2)  # Create a bitmap object,width, height, bit depth
-color = displayio.Palette(4)  # Create a color palette
+bitmap = displayio.Bitmap(64, 32, len(color_codes) + 1)  # Create a bitmap object,width, height, bit depth
+color = displayio.Palette(len(color_codes) + 1)  # Create a color palette
 color[0] = 0x000000  # black background
-color[1] = 0xFF0000  # red
-color[2] = 0xCC4000  # amber
-color[3] = 0x85FF00  # greenish
+for idx, val in enumerate(color_codes.values()):
+    color[idx + 1] = val
 
 # Create a TileGrid using the Bitmap and Palette
 tile_grid = displayio.TileGrid(bitmap, pixel_shader=color)
@@ -113,9 +125,14 @@ if not DEBUG:
 else:
     font = terminalio.FONT
     font2 = terminalio.FONT
+    small_font = terminalio.FONT
 
 clock_label = Label(font, max_glyphs=8)
-test_label = Label(font2, max_glyphs=32)
+clock_label.color_idx = 1
+clock_label.color = color[clock_label.color_idx]
+event_label = Label(font2, max_glyphs=32)
+event_label.color_idx = 2
+event_label.color = color[event_label.color_idx]
 
 DATA_LOCATION = []
 
@@ -129,10 +146,10 @@ class Events:
     def __init__(self):
         self.index = 0
         self.events = {'Christmas': [12, 25],
-                  'Halloween': [10, 31],
-                  "Jim's birthday": [5, 29],
-                  'Independence Day': [7, 4],
-                  }
+                       'Halloween': [10, 31],
+                       "Jim's birthday": [5, 29],
+                       'Independence Day': [7, 4],
+                       }
 
     def get_next_event_string(self):
         event = list(self.events.items())[self.index]
@@ -144,6 +161,7 @@ class Events:
 
     def get_time_until(self):
         event = list(self.events.items())[self.index]
+        # noinspection PyTypeChecker
         event_time = time.struct_time(
             (
                 2021,
@@ -160,7 +178,7 @@ class Events:
         remaining = time.mktime(event_time) - time.mktime(time.localtime())
         if remaining <= 0:
             # oh, its event time!
-            return '0 days till '
+            return 'Today is '
 
         remaining //= (24 * 60 * 60)
         days_remaining = remaining
@@ -190,13 +208,8 @@ def update_time(*, hours=None, minutes=None, show_colon=False,
         if weather.weather_data:
             weather.weather_refresh = time.monotonic()
 
-    # print(now)
     if hours is None:
         hours = now[3]
-    if hours >= 18 or hours < 6:  # evening hours to morning
-        clock_label.color = color[1]
-    else:
-        clock_label.color = color[3]  # daylight hours
     if hours > 12:  # Handle times later than 12:59
         hours -= 12
     elif not hours:  # Handle times between 0:00 and 0:59
@@ -204,11 +217,6 @@ def update_time(*, hours=None, minutes=None, show_colon=False,
 
     if minutes is None:
         minutes = now[4]
-
-    # if BLINK:
-    #     colon = ":" if show_colon or now[5] % 2 else " "
-    # else:
-    #     colon = ":"
 
     if now[5] % 30 < 12:
         clock_label.text = f"{hours}:{minutes:02d}"
@@ -244,24 +252,25 @@ def update_time(*, hours=None, minutes=None, show_colon=False,
 
 
 def update_second_line():
-    test_label.text = f'{value}'
-    bbx, bby, bbwidth, bbh = test_label.bounding_box
+    event_label.text = f'{value}'
+    bbx, bby, bbwidth, bbh = event_label.bounding_box
     x = round(display.width / 2 - bbwidth / 2)
     if x < 0:
-        test_label.x = 0
+        event_label.x = 0
     else:
-        test_label.x = x
-    test_label.y = display.height // 4 * 3
+        event_label.x = x
+    event_label.y = display.height // 4 * 3
 
 
 def scroll_second_line():
-    if test_label.text is None or test_label.x < -test_label.bounding_box[2]:
-        test_label.text = ''
-        test_label.x = display.width
-        test_label.y = display.height // 4 * 3
-        test_label.text = events.get_next_event_string()
+    if event_label.text is None or event_label.x < -event_label.bounding_box[2]:
+        event_label.text = ''
+        event_label.x = display.width
+        event_label.y = display.height // 4 * 3
+        event_label.text = events.get_next_event_string()
     else:
-        test_label.x -= 1
+        event_label.x -= 1
+
 
 weather = Weather()
 events = Events()
@@ -269,11 +278,28 @@ last_check = None
 update_time(show_colon=True, weather=weather)  # Display whatever time is on the board
 # update_second_line('?')
 group.append(clock_label)  # add the clock label to the group
-group.append(test_label)
+group.append(event_label)
 
-counter = 0
+
+def check_button_press():
+    if not button_up.value:
+        print('up button pushed')
+        clock_label.color_idx += 1
+        if clock_label.color_idx >= len(color_codes):
+            clock_label.color_idx = 1
+        clock_label.color = color[clock_label.color_idx]
+        time.sleep(0.5)
+    elif not button_down.value:
+        print('down button pushed')
+        event_label.color_idx += 1
+        if event_label.color_idx >= len(color_codes):
+            event_label.color_idx = 1
+        event_label.color = color[event_label.color_idx]
+        time.sleep(0.5)
+
+
 while True:
-    counter += 1
+    check_button_press()
     if last_check is None or time.monotonic() > last_check + 3600:
         try:
             update_time(
