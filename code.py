@@ -285,14 +285,14 @@ def check_button_press():
     if not button_up.value:
         print('up button pushed')
         clock_label.color_idx += 1
-        if clock_label.color_idx >= len(color_codes):
+        if clock_label.color_idx >= len(color_codes) + 1:
             clock_label.color_idx = 1
         clock_label.color = color[clock_label.color_idx]
         time.sleep(0.5)
     elif not button_down.value:
         print('down button pushed')
         event_label.color_idx += 1
-        if event_label.color_idx >= len(color_codes):
+        if event_label.color_idx >= len(color_codes) + 1:
             event_label.color_idx = 1
         event_label.color = color[event_label.color_idx]
         time.sleep(0.5)
