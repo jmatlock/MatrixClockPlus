@@ -130,9 +130,16 @@ else:
 clock_label = Label(font, max_glyphs=8)
 clock_label.color_idx = 1
 clock_label.color = color[clock_label.color_idx]
+clock_label.text = 'Matrix'
+clock_label.x = 0
+clock_label.y = display.height // 4
+clock_label.normal = True
 event_label = Label(font2, max_glyphs=32)
 event_label.color_idx = 2
 event_label.color = color[event_label.color_idx]
+event_label.text = 'Clock'
+event_label.x = 0
+event_label.y = display.height // 4 * 3
 
 DATA_LOCATION = []
 
@@ -149,6 +156,12 @@ class Events:
                        'Halloween': [10, 31],
                        "Jim's birthday": [5, 29],
                        'Independence Day': [7, 4],
+                       "New Year's Day": [1, 1],
+                       'MLK Jr. Day': [1, 18],
+                       'Valentines Day': [2, 14],
+                       "St. Patty's Day": [3, 14],
+                       'Summer Solstice': [6, 20],
+                       'Winter Solstice': [12, 21],
                        }
 
     def get_next_event_string(self):
@@ -162,9 +175,10 @@ class Events:
     def get_time_until(self):
         event = list(self.events.items())[self.index]
         # noinspection PyTypeChecker
+        year = time.localtime()[0]
         event_time = time.struct_time(
             (
-                2021,
+                year,
                 event[1][0],
                 event[1][1],
                 12,
@@ -176,7 +190,22 @@ class Events:
             )
         )
         remaining = time.mktime(event_time) - time.mktime(time.localtime())
-        if remaining <= 0:
+        if remaining < 0:  # Need to add a year to the event
+            event_time = time.struct_time(
+                (
+                    year+1,
+                    event[1][0],
+                    event[1][1],
+                    12,
+                    0,
+                    0,
+                    -1,
+                    -1,
+                    False,
+                )
+            )
+            remaining = time.mktime(event_time) - time.mktime(time.localtime())
+        if remaining == 0:
             # oh, its event time!
             return 'Today is '
 
@@ -191,16 +220,21 @@ class Events:
 
 def get_weather_info():
     try:
+        clock_label.text = 'Updating'
+        clock_label.x = 0
+        event_label.text = 'Weather'
+        event_label.x = 0
         value = network.fetch_data(DATA_SOURCE, json_path=(DATA_LOCATION,))
         print("Response is", value)
+        clock_label.text = ''
+        event_label.text = ''
         return value
     except RuntimeError as e:
         print("Some error occurred, retrying! -", e)
         return None
 
 
-def update_time(*, hours=None, minutes=None, show_colon=False,
-                weather=None):
+def update_time(*, hours=None, minutes=None, weather=None):
     now = time.localtime()  # Get the time values we need
     # Update weather data every 10 minutes
     if (not weather.weather_refresh) or (time.monotonic() - weather.weather_refresh) > 600:
@@ -220,7 +254,9 @@ def update_time(*, hours=None, minutes=None, show_colon=False,
 
     if now[5] % 30 < 12:
         clock_label.text = f"{hours}:{minutes:02d}"
-        clock_label.font = font
+        if not clock_label.normal:
+            clock_label.normal = True
+            clock_label.font = font
     elif now[5] % 30 < 15:
         clock_label.text = f"{wkdays[now[6]]}"
     elif now[5] % 30 < 20:
@@ -239,7 +275,9 @@ def update_time(*, hours=None, minutes=None, show_colon=False,
         except Exception as e:
             weather_description = "??"
         if len(weather_description) > 6:
-            clock_label.font = font2
+            if clock_label.normal:
+                clock_label.normal = False
+                clock_label.font = font2
         clock_label.text = f"{weather_description}"
 
     bbx, bby, bbwidth, bbh = clock_label.bounding_box
@@ -249,17 +287,6 @@ def update_time(*, hours=None, minutes=None, show_colon=False,
     if DEBUG:
         print("Label bounding box: {},{},{},{}".format(bbx, bby, bbwidth, bbh))
         print("Label x: {} y: {}".format(clock_label.x, clock_label.y))
-
-
-def update_second_line():
-    event_label.text = f'{value}'
-    bbx, bby, bbwidth, bbh = event_label.bounding_box
-    x = round(display.width / 2 - bbwidth / 2)
-    if x < 0:
-        event_label.x = 0
-    else:
-        event_label.x = x
-    event_label.y = display.height // 4 * 3
 
 
 def scroll_second_line():
@@ -275,8 +302,7 @@ def scroll_second_line():
 weather = Weather()
 events = Events()
 last_check = None
-update_time(show_colon=True, weather=weather)  # Display whatever time is on the board
-# update_second_line('?')
+update_time(weather=weather)  # Display whatever time is on the board
 group.append(clock_label)  # add the clock label to the group
 group.append(event_label)
 
@@ -302,22 +328,19 @@ while True:
     check_button_press()
     if last_check is None or time.monotonic() > last_check + 3600:
         try:
-            update_time(
-                show_colon=True,
-                weather=weather
-            )  # Make sure a colon is displayed while updating
+            clock_label.text = 'Time'
+            clock_label.x = 0
+            event_label.text = 'Sync'
+            event_label.x = 0
             network.get_local_time()  # Synchronize Board's clock to Internet
+            update_time(
+                weather=weather
+            )
             last_check = time.monotonic()
         except RuntimeError as e:
             print("Some error occured, retrying! -", e)
 
     update_time(weather=weather)
-    # if counter % 4 == 0:
-    #     event_txt = events.get_next_event_string()
-    #     update_second_line(event_txt)
-    #     if counter >= 100:
-    #         counter = 0
-    #     print(event_txt)
     scroll_second_line()
 
     time.sleep(0.03)
